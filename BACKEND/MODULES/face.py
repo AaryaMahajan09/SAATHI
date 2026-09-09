@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
@@ -6,7 +7,9 @@ from mtcnn import MTCNN
 # =========================
 # LOAD MODEL
 # =========================
-model = load_model(r"C:\Users\rutuja\Desktop\dep_detection\DEPRESSION-DETECTION\BACKEND\MODELS\emotion_model_best.h5")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(BASE_DIR, "MODELS", "emotion_model_best.h5")
+model = load_model(MODEL_PATH)
 
 # =========================
 # FACE DETECTOR

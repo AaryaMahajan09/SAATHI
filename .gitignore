@@ -6,7 +6,19 @@ __pycache__/
 .venv
 venv/
 ENV/
+saathi_env/
+depression_env/
+
+# Database files
+database/*.db
+*.sqlite3
+*.db
+!database/.gitkeep
+
+# Temporary files
 temp/*
 !temp/.gitkeep
+
+# OS files
 .DS_Store
-Thumbs.db
+Thumbs.db

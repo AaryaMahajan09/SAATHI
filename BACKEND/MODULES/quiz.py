@@ -7,7 +7,9 @@ import os
 
 # Load trained model
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "quiz_model.pkl")
+MODEL_PATH = os.path.join(BASE_DIR, "MODELS", "quiz_model.pkl")
+if not os.path.exists(MODEL_PATH):
+    MODEL_PATH = os.path.join(BASE_DIR, "models", "quiz_model.pkl")
 
 model = joblib.load(MODEL_PATH)
 

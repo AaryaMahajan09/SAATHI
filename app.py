@@ -11,7 +11,7 @@ from db import init_db, create_user, get_user_by_email, save_result, get_results
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-app.secret_key = "super_secret_key_123"
+app.secret_key = os.environ.get("SECRET_KEY", "super_secret_key_123")
 
 # ==============================
 # PATH SETUP
