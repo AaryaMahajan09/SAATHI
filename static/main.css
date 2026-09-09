@@ -1,0 +1,190 @@
+/* =============================================
+   SIDEBAR & DASHBOARD LAYOUT — Dark Theme
+============================================= */
+
+/* ─── SIDEBAR ─────────────────────────────── */
+.sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 260px;
+    height: 100vh;
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.4);
+}
+
+/* Brand bar at top */
+.sidebar-brand-wrapper {
+    padding: 24px 20px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-title {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #a78bfa, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-acronym {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.35;
+    margin-top: 6px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    opacity: 0.85;
+}
+
+.acr-letter {
+    color: #67e8f9;
+    font-weight: 700;
+}
+
+/* Nav section */
+.sidebar nav {
+    padding: 20px 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Nav label */
+.sidebar nav .nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: 4px 12px 8px;
+    margin-top: 8px;
+}
+
+/* Nav links */
+.sidebar nav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 14.5px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.sidebar nav a i {
+    width: 18px;
+    text-align: center;
+    font-size: 15px;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+}
+
+.sidebar nav a:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+}
+
+.sidebar nav a:hover i { opacity: 1; }
+
+/* Active state */
+.sidebar nav a.active {
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(37,99,235,0.15));
+    color: #a78bfa;
+    font-weight: 600;
+    border: 1px solid rgba(124,58,237,0.2);
+}
+
+.sidebar nav a.active i { opacity: 1; color: #a78bfa; }
+
+/* Active indicator bar */
+.sidebar nav a.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 20px;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(to bottom, #7c3aed, #2563eb);
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-footer a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    color: #ef4444;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.sidebar-footer a:hover {
+    background: rgba(239,68,68,0.12);
+}
+
+/* ─── MAIN CONTENT ─────────────────────────── */
+.main-content {
+    margin-left: 260px;
+    padding: 32px 36px;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+/* Page header */
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-header .page-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 6px;
+}
+
+.page-header .page-subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+/* ─── UTILITY ───────────────────────────────── */
+.text-center { text-align: center; }
+.hidden { display: none; }
+
+/* ─── RESPONSIVE ────────────────────────────── */
+@media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main-content { margin-left: 0; padding: 20px; }
+}

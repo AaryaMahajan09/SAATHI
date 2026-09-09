@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Assessment{% endblock %}
+{% block assess_active %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='text-quiz.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container fade-in">
+
+    <!-- ── HEADER ───────────────────────────────────── -->
+    <div class="quiz-header">
+        <a href="{{ url_for('assessment') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <div class="quiz-badge">
+            <i class="fas fa-clipboard-list"></i> PHQ-9 Assessment
+        </div>
+        <h1 class="quiz-title">Depression Assessment Quiz</h1>
+        <p class="quiz-subtitle">
+            Rate how often you have been bothered by each of the following
+            over the <strong>last 2 weeks</strong>.
+            Select one option per question, then submit.
+        </p>
+    </div>
+
+    <!-- Flash messages from Flask -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }}" style="max-width:720px; margin: 0 auto 16px;">
+                <i class="fas fa-circle-exclamation"></i> {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- ── FORM ─────────────────────────────────────── -->
+    <form method="POST" action="/text_quiz" id="quizForm">
+
+        {% for i, question in questions %}
+        <div class="quiz-question-card" id="qcard-{{ i }}">
+
+            <!-- Question number indicator -->
+            <div class="q-num-row">
+                <div class="q-badge">Q{{ i }}</div>
+                <span class="q-required">Required</span>
+            </div>
+
+            <p class="q-text">{{ question }}</p>
+
+            <!-- Radio option cards -->
+            <div class="q-options" role="group" aria-label="Frequency">
+                {% set opts = [
+                    (0, 'Not at all',             'fas fa-face-meh-blank',   'opt-zero'),
+                    (1, 'Several days',            'fas fa-face-rolling-eyes','opt-one'),
+                    (2, 'More than half the days', 'fas fa-face-frown',       'opt-two'),
+                    (3, 'Nearly every day',        'fas fa-face-sad-cry',     'opt-three')
+                ] %}
+                {% for val, label, icon, cls in opts %}
+                <label class="q-option {{ cls }}" for="q{{ i }}_opt{{ val }}">
+                    <input type="radio"
+                           name="q{{ i }}"
+                           id="q{{ i }}_opt{{ val }}"
+                           value="{{ val }}"
+                           class="q-radio"
+                           required>
+                    <div class="q-option-inner">
+                        <i class="{{ icon }}"></i>
+                        <span class="q-opt-val">{{ val }}</span>
+                        <span class="q-opt-label">{{ label }}</span>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+
+        </div>
+        {% endfor %}
+
+        <!-- ── SUBMIT ──────────────────────────────── -->
+        <div class="quiz-submit-area">
+            <p class="quiz-submit-hint">
+                <i class="fas fa-info-circle"></i>
+                Answer all {{ questions|length }} questions, then click submit.
+                Your browser will remind you of any missed questions.
+            </p>
+            <button class="btn btn-primary quiz-submit-btn" type="submit" id="quizSubmitBtn">
+                <i class="fas fa-paper-plane"></i>
+                Submit Assessment
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

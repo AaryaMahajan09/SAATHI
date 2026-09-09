@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Voice Analysis{% endblock %}
+{% block assess_active %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='voice-analysis.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container fade-in">
+
+    <!-- ── HEADER ───────────────────────────────────── -->
+    <div class="voice-header">
+        <a href="{{ url_for('assessment') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <div class="voice-badge">
+            <i class="fas fa-microphone-lines"></i> Voice Analysis
+        </div>
+        <h1 class="voice-title">AI Voice Analysis</h1>
+        <p class="voice-subtitle">
+            Answer each question by speaking your response.
+            Your speech is transcribed and analysed by our NLP model.
+        </p>
+
+        <!-- Tip -->
+        <div class="voice-tip">
+            <i class="fas fa-lightbulb"></i>
+            <span>
+                <strong>Tip:</strong> Press the microphone button, speak freely and naturally —
+                the AI reads sentiment and meaning from your words.
+                Aim for at least 2–3 sentences per question.
+            </span>
+        </div>
+
+        <!-- Browser support warning (shown via JS if unsupported) -->
+        <div class="voice-no-support" id="noSupportBanner" style="display:none;">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span>Your browser does not support the Web Speech API. Please use Chrome or Edge for voice input.</span>
+        </div>
+    </div>
+
+    <!-- Flash messages from Flask -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }}" style="max-width:680px; margin: 0 auto 16px;">
+                <i class="fas fa-circle-exclamation"></i> {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- ── FORM ─────────────────────────────────────── -->
+    <form method="POST" action="/analyze_voice" id="voiceForm">
+
+        {% for q in questions %}
+        <div class="voice-q-card" id="vq-{{ q.id }}">
+
+            <!-- Header -->
+            <div class="vq-header">
+                <span class="vq-num">{{ loop.index }} / {{ questions|length }}</span>
+                <span class="vq-required">Required</span>
+            </div>
+
+            <!-- Question text -->
+            <p class="vq-text">{{ q.text }}</p>
+
+            <!-- Voice recorder UI -->
+            <div class="vq-recorder" id="recorder-{{ q.id }}">
+
+                <!-- Mic button + waveform -->
+                <div class="mic-area">
+                    <button type="button"
+                            class="mic-btn"
+                            id="mic-{{ q.id }}"
+                            data-qid="{{ q.id }}"
+                            title="Click to start recording">
+                        <span class="mic-icon"><i class="fas fa-microphone"></i></span>
+                        <span class="mic-ring mic-ring-1"></span>
+                        <span class="mic-ring mic-ring-2"></span>
+                    </button>
+                    <div class="mic-status" id="status-{{ q.id }}">
+                        <span class="status-dot" id="dot-{{ q.id }}"></span>
+                        <span class="status-text" id="stext-{{ q.id }}">Click to start recording</span>
+                    </div>
+                </div>
+
+                <!-- Waveform bars (animated while recording) -->
+                <div class="waveform" id="wave-{{ q.id }}">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                </div>
+
+                <!-- Transcript display -->
+                <div class="transcript-wrap" id="tw-{{ q.id }}">
+                    <label class="transcript-label">
+                        <i class="fas fa-align-left"></i> Transcript
+                        <button type="button" class="clear-btn" id="clear-{{ q.id }}" data-qid="{{ q.id }}" title="Clear">
+                            <i class="fas fa-rotate-left"></i> Clear
+                        </button>
+                    </label>
+                    <div class="transcript-box" id="tbox-{{ q.id }}">
+                        <span class="transcript-placeholder">Your speech will appear here…</span>
+                    </div>
+                    <!-- Hidden field actually submitted -->
+                    <input type="hidden" name="{{ q.id }}" id="hidden-{{ q.id }}" value="">
+                </div>
+
+            </div>
+
+        </div>
+        {% endfor %}
+
+        <!-- ── SUBMIT ──────────────────────────────── -->
+        <div class="voice-submit-area">
+            <p class="voice-submit-hint" id="submitHint">
+                <i class="fas fa-info-circle"></i>
+                Record all {{ questions|length }} questions, then click the button below.
+            </p>
+            <button type="submit" class="btn btn-primary voice-submit-btn" id="submitVoice">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                Analyse My Responses
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    "use strict";
+
+    // ── 1. Check for Web Speech API support ──────────────
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        document.getElementById('noSupportBanner').style.display = 'flex';
+        // Fall back: show plain textareas so the form is still usable
+        document.querySelectorAll('.vq-recorder').forEach(function (wrap) {
+            const qid = wrap.id.replace('recorder-', '');
+            const hidden = document.getElementById('hidden-' + qid);
+            const fallback = document.createElement('textarea');
+            fallback.name = qid;
+            fallback.id = 'txt-' + qid;
+            fallback.className = 'input voice-textarea';
+            fallback.rows = 4;
+            fallback.placeholder = 'Voice not supported — type your answer here…';
+            fallback.required = true;
+            fallback.minLength = 10;
+            fallback.addEventListener('input', function () {
+                hidden.value = this.value;
+            });
+            wrap.appendChild(fallback);
+            hidden.removeAttribute('name'); // avoid double-submit
+        });
+        return;
+    }
+
+    // ── 2. Per-question recorder state ───────────────────
+    const recorders = {}; // qid → { recognition, recording, finalText }
+
+    document.querySelectorAll('.mic-btn').forEach(function (btn) {
+        const qid = btn.dataset.qid;
+        recorders[qid] = { recognition: null, recording: false, finalText: '' };
+
+        btn.addEventListener('click', function () {
+            const state = recorders[qid];
+            if (state.recording) {
+                stopRecording(qid);
+            } else {
+                startRecording(qid);
+            }
+        });
+    });
+
+    document.querySelectorAll('.clear-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const qid = btn.dataset.qid;
+            stopRecording(qid);
+            recorders[qid].finalText = '';
+            setTranscript(qid, '');
+            setStatus(qid, 'idle');
+        });
+    });
+
+    // ── 3. Start recording ───────────────────────────────
+    function startRecording(qid) {
+        const state = recorders[qid];
+        // Stop any other active recorder
+        Object.keys(recorders).forEach(function (id) {
+            if (id !== qid && recorders[id].recording) stopRecording(id);
+        });
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'en-US';
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.maxAlternatives = 1;
+
+        rec.onstart = function () {
+            state.recording = true;
+            setStatus(qid, 'recording');
+        };
+
+        rec.onresult = function (e) {
+            let interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const t = e.results[i][0].transcript;
+                if (e.results[i].isFinal) {
+                    state.finalText += t + ' ';
+                } else {
+                    interim = t;
+                }
+            }
+            renderTranscript(qid, interim);
+        };
+
+        rec.onerror = function (e) {
+            console.error('Speech error:', e.error);
+            state.recording = false;
+            if (e.error === 'no-speech')      setStatus(qid, 'no-speech');
+            else if (e.error === 'not-allowed') setStatus(qid, 'denied');
+            else                               setStatus(qid, 'error');
+        };
+
+        rec.onend = function () {
+            if (state.recording) {
+                // Auto-restart to keep continuous recording
+                try { rec.start(); } catch (_) {}
+            } else {
+                setStatus(qid, state.finalText.trim() ? 'done' : 'idle');
+            }
+        };
+
+        state.recognition = rec;
+        state.recording = true;
+        try { rec.start(); }
+        catch (err) { state.recording = false; setStatus(qid, 'error'); }
+    }
+
+    // ── 4. Stop recording ────────────────────────────────
+    function stopRecording(qid) {
+        const state = recorders[qid];
+        state.recording = false;
+        if (state.recognition) {
+            try { state.recognition.stop(); } catch (_) {}
+        }
+        setStatus(qid, state.finalText.trim() ? 'done' : 'idle');
+        renderTranscript(qid, ''); // clear interim text
+    }
+
+    // ── 5. Render transcript ─────────────────────────────
+    function renderTranscript(qid, interim) {
+        const state = recorders[qid];
+        const full = state.finalText + (interim ? '<span class="interim">' + escHtml(interim) + '</span>' : '');
+        setTranscript(qid, full, true);
+    }
+
+    function setTranscript(qid, html, isHtml) {
+        const box    = document.getElementById('tbox-' + qid);
+        const hidden = document.getElementById('hidden-' + qid);
+        if (isHtml) {
+            box.innerHTML = html || '<span class="transcript-placeholder">Your speech will appear here…</span>';
+        } else {
+            if (!html) {
+                box.innerHTML = '<span class="transcript-placeholder">Your speech will appear here…</span>';
+            } else {
+                box.textContent = html;
+            }
+        }
+        hidden.value = recorders[qid].finalText.trim();
+    }
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── 6. Status helpers ────────────────────────────────
+    const STATUS = {
+        idle:        { dot: '',          text: 'Click the mic to start recording' },
+        recording:   { dot: 'recording', text: 'Recording… click again to stop' },
+        done:        { dot: 'done',      text: 'Done — click to re-record' },
+        'no-speech': { dot: '',          text: 'No speech detected — try again' },
+        denied:      { dot: 'error',     text: 'Microphone access denied' },
+        error:       { dot: 'error',     text: 'Error — please try again' },
+    };
+
+    function setStatus(qid, key) {
+        const s    = STATUS[key] || STATUS.idle;
+        const dot  = document.getElementById('dot-'   + qid);
+        const txt  = document.getElementById('stext-' + qid);
+        const btn  = document.getElementById('mic-'   + qid);
+        const wave = document.getElementById('wave-'  + qid);
+
+        dot.className = 'status-dot' + (s.dot ? ' ' + s.dot : '');
+        txt.textContent = s.text;
+
+        if (key === 'recording') {
+            btn.classList.add('active');
+            wave.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+            wave.classList.remove('active');
+        }
+    }
+
+    // ── 7. Form validation ───────────────────────────────
+    document.getElementById('voiceForm').addEventListener('submit', function (e) {
+        let allFilled = true;
+        document.querySelectorAll('.mic-btn').forEach(function (btn) {
+            const qid = btn.dataset.qid;
+            if (recorders[qid] && recorders[qid].recording) stopRecording(qid);
+            const val = document.getElementById('hidden-' + qid).value.trim();
+            if (!val) allFilled = false;
+        });
+        if (!allFilled) {
+            e.preventDefault();
+            const hint = document.getElementById('submitHint');
+            hint.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:#f87171"></i> <span style="color:#f87171">Please record a response for every question before submitting.</span>';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Full Assessment — Stage 2{% endblock %}
+{% block assess_active %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='full-assessment.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container fade-in">
+
+    <!-- ── STAGE INDICATOR ────────────────────────────── -->
+    <div class="stage-banner">
+        <div class="stage-step completed">
+            <div class="step-circle"><i class="fas fa-check"></i></div>
+            <span class="step-label">PHQ-9 Quiz</span>
+        </div>
+        <div class="stage-line completed"></div>
+        <div class="stage-step active">
+            <div class="step-circle">2</div>
+            <span class="step-label">Video Chat</span>
+        </div>
+    </div>
+
+    <div class="quiz-header" style="text-align: center; margin-bottom: 30px;">
+        <h1 class="quiz-title">Stage 2: Video Interview</h1>
+        <p class="quiz-subtitle" style="margin: 0 auto; max-width: 600px;">
+            Please answer the following questions clearly. Your voice and facial expressions will be recorded for analysis.
+        </p>
+    </div>
+
+    <!-- Flash messages from Flask -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }}" style="max-width:900px; margin: 0 auto 16px;">
+                <i class="fas fa-circle-exclamation"></i> {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="video-chat-container">
+        
+        <!-- LEFT PANE: VIDEO FEED -->
+        <div class="video-pane">
+            <div class="video-wrapper">
+                <video id="webcamPreview" autoplay muted playsinline></video>
+                <div class="recording-indicator" id="recIndicator">
+                    <span class="dot"></span> REC
+                </div>
+                <div class="webcam-overlay" id="webcamOverlay">
+                    <i class="fas fa-camera"></i>
+                    <p>Requesting camera access...</p>
+                </div>
+            </div>
+            <div class="video-info">
+                <i class="fas fa-shield-halved"></i> Your video is processed securely and is not stored permanently.
+            </div>
+        </div>
+
+        <!-- RIGHT PANE: QUESTION & CONTROLS -->
+        <div class="interaction-pane">
+            
+            <form id="fullAssessmentForm" method="POST" action="{{ url_for('full_assessment_submit') }}" enctype="multipart/form-data">
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 20%;"></div>
+                </div>
+                <div class="q-tracker">Question <span id="currentQNum">1</span> of {{ questions|length }}</div>
+
+                <!-- Questions Container -->
+                <div class="questions-carousel">
+                    {% for q in questions %}
+                    <div class="q-slide {% if loop.first %}active{% endif %}" id="slide-{{ loop.index }}" data-qid="{{ q.id }}">
+                        <h3 class="q-text">"{{ q.text }}"</h3>
+                        
+                        <!-- Transcript Box -->
+                        <div class="transcript-box">
+                            <div class="transcript-label"><i class="fas fa-quote-left"></i> Transcript</div>
+                            <div class="transcript-content" id="transcript-{{ loop.index }}">
+                                <span class="placeholder">Your speech will appear here...</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden Inputs for Form Submit -->
+                        <input type="hidden" name="transcript_{{ q.id }}" id="hidden-transcript-{{ loop.index }}" value="">
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Controls -->
+                <div class="controls-area">
+                    <button type="button" class="btn btn-record" id="btnRecord">
+                        <i class="fas fa-microphone"></i> Start Recording
+                    </button>
+                    
+                    <button type="button" class="btn btn-stop hidden" id="btnStop">
+                        <i class="fas fa-stop"></i> Stop & Next
+                    </button>
+                    
+                    <button type="submit" class="btn btn-submit hidden" id="btnSubmit">
+                        <i class="fas fa-wand-magic-sparkles"></i> Finish & Analyse
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    "use strict";
+
+    const NUM_QUESTIONS = parseInt("{{ questions|length }}", 10);
+    let currentStep = 1;
+    
+    // UI Elements
+    const videoElem = document.getElementById('webcamPreview');
+    const overlay = document.getElementById('webcamOverlay');
+    const recIndicator = document.getElementById('recIndicator');
+    const btnRecord = document.getElementById('btnRecord');
+    const btnStop = document.getElementById('btnStop');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const progressFill = document.getElementById('progressFill');
+    const currentQNum = document.getElementById('currentQNum');
+    const form = document.getElementById('fullAssessmentForm');
+
+    // Media and Speech vars
+    let stream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let speechRecognition = null;
+    let finalTranscript = "";
+
+    // 1. Initialize Camera
+    async function initCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            videoElem.srcObject = stream;
+            overlay.style.display = 'none';
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            overlay.innerHTML = '<i class="fas fa-video-slash" style="color:#ef4444;"></i><p>Camera/Microphone access denied. Please enable permissions to continue.</p>';
+        }
+    }
+
+    // 2. Initialize Speech Recognition
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+        speechRecognition = new SpeechRec();
+        speechRecognition.continuous = true;
+        speechRecognition.interimResults = true;
+        speechRecognition.lang = 'en-US';
+
+        speechRecognition.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript + ' ';
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+            updateTranscriptUI(finalTranscript, interim);
+        };
+        
+        speechRecognition.onerror = (e) => console.error("Speech Rec Error:", e.error);
+        
+        speechRecognition.onend = () => {
+            // Keep it running if we are still recording
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                try { speechRecognition.start(); } catch (e) {}
+            }
+        };
+    } else {
+        alert("Your browser does not support Speech Recognition. Please use Chrome or Edge.");
+    }
+
+    function updateTranscriptUI(finalTxt, interimTxt) {
+        const box = document.getElementById('transcript-' + currentStep);
+        if (!box) return;
+        
+        if (finalTxt === '' && interimTxt === '') {
+            box.innerHTML = '<span class="placeholder">Your speech will appear here...</span>';
+            return;
+        }
+
+        let html = finalTxt;
+        if (interimTxt) {
+            html += '<span style="color:var(--text-secondary); font-style:italic;">' + interimTxt + '</span>';
+        }
+        box.innerHTML = html;
+        
+        // Also update hidden field
+        const hiddenInput = document.getElementById('hidden-transcript-' + currentStep);
+        if (hiddenInput) {
+            hiddenInput.value = finalTxt.trim();
+        }
+    }
+
+    // 3. Control Logic
+    btnRecord.addEventListener('click', () => {
+        if (!stream) {
+            alert("Waiting for camera/microphone access...");
+            return;
+        }
+        
+        // Reset transcript
+        finalTranscript = '';
+        updateTranscriptUI('', '');
+        
+        // Start Video Recording
+        recordedChunks = [];
+        let options = { mimeType: 'video/webm;codecs=vp8,opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/mp4' };
+            }
+        }
+        
+        try {
+            mediaRecorder = new MediaRecorder(stream, options);
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.start(200); // collect 200ms chunks
+        } catch (e) {
+            console.error("MediaRecorder start failed:", e);
+            alert("Could not start video recording.");
+            return;
+        }
+
+        // Start Speech Recognition
+        if (speechRecognition) {
+            try { speechRecognition.start(); } catch (e) {}
+        }
+
+        // UI Updates
+        recIndicator.style.display = 'flex';
+        btnRecord.classList.add('hidden');
+        btnStop.classList.remove('hidden');
+        document.getElementById('slide-' + currentStep).classList.add('recording');
+    });
+
+    btnStop.addEventListener('click', () => {
+        // Stop Speech Recognition
+        if (speechRecognition) {
+            speechRecognition.stop();
+        }
+        
+        recIndicator.style.display = 'none';
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.onstop = () => {
+                const mime = mediaRecorder.mimeType || 'video/webm';
+                const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(recordedChunks, { type: mime });
+                
+                const qid = document.getElementById('slide-' + currentStep).dataset.qid;
+                const file = new File([blob], `video_${qid}.${ext}`, { type: mime });
+                
+                try {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.name = `video_${qid}`;
+                    fileInput.files = dataTransfer.files;
+                    fileInput.style.display = 'none';
+                    form.appendChild(fileInput);
+                } catch (e) {
+                    console.error("DataTransfer error (likely Safari):", e);
+                    // Fallback for older browsers without DataTransfer: just ignore video upload for now
+                }
+                
+                // Move to next question
+                goToNextQuestion();
+            };
+            mediaRecorder.stop();
+        } else {
+            // If mediaRecorder was never started or already stopped
+            goToNextQuestion();
+        }
+    });
+
+    function goToNextQuestion() {
+        document.getElementById('slide-' + currentStep).classList.remove('active', 'recording');
+        
+        if (currentStep < NUM_QUESTIONS) {
+            currentStep++;
+            document.getElementById('slide-' + currentStep).classList.add('active');
+            
+            // Update Progress
+            currentQNum.textContent = currentStep;
+            progressFill.style.width = ((currentStep / NUM_QUESTIONS) * 100) + '%';
+            
+            // Reset Buttons
+            btnStop.classList.add('hidden');
+            btnRecord.classList.remove('hidden');
+            
+        } else {
+            // Reached the end
+            btnStop.classList.add('hidden');
+            btnSubmit.classList.remove('hidden');
+            
+            // We can optionally stop the camera here
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElem.srcObject = null;
+                overlay.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;"></i><p>All questions recorded!</p>';
+                overlay.style.display = 'flex';
+            }
+        }
+    }
+
+    // Start!
+    initCamera();
+
+})();
+</script>
+{% endblock %}

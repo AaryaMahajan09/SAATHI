@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — SAATHI</title>
+    <meta name="description" content="Sign in to your SAATHI mental wellness dashboard">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+</head>
+
+<body class="auth-body">
+
+    <!-- Animated background -->
+    <div class="auth-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <div class="auth-split">
+
+        <!-- ── LEFT PANEL — Brand ────────────────── -->
+        <div class="auth-brand fade-in">
+            <div class="brand-content">
+                <div class="brand-icon">
+                    <i class="fas fa-brain"></i>
+                    <div class="icon-ring"></div>
+                </div>
+                <h1 class="brand-name">SAATHI</h1>
+                <div class="brand-badge-meaning">
+                    <span class="meaning-letter">S</span>tress <span class="meaning-letter">A</span>ssessment <span class="meaning-word">and</span> <span class="meaning-letter">T</span>rauma <span class="meaning-letter">A</span>ware <span class="meaning-letter">H</span>elpline <span class="meaning-letter">I</span>ntelligence
+                </div>
+                <p class="brand-tagline">Your empathetic AI companion for mental wellness assessment &amp; supportive insights</p>
+
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-microphone-lines"></i></div>
+                        <div>
+                            <strong>Voice Analysis</strong>
+                            <span>Detects patterns in your speech</span>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <div>
+                            <strong>PHQ-9 Quiz</strong>
+                            <span>Clinically validated questionnaire</span>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                        <div>
+                            <strong>Wellness Tracking</strong>
+                            <span>Monitor progress over time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RIGHT PANEL — Form ────────────────── -->
+        <div class="auth-form-panel">
+            <div class="auth-card scale-in">
+
+                <div class="auth-header">
+                    <p class="auth-welcome">Welcome back 👋</p>
+                    <h2 class="auth-title">Sign in to your account</h2>
+                    <p class="auth-subtitle">Continue your wellness journey</p>
+                </div>
+
+                <!-- Flask flash messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                                <i class="fas fa-circle-exclamation"></i> {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="/login">
+
+                    <div class="form-group">
+                        <label class="form-label" for="email">
+                            <i class="fas fa-envelope"></i> Email address
+                        </label>
+                        <input class="input" type="email" id="email" name="email"
+                               placeholder="you@example.com" required autocomplete="email">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <input class="input" type="password" id="password" name="password"
+                               placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary full-width auth-submit">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        Sign In
+                    </button>
+
+                </form>
+
+                <div class="auth-footer">
+                    <p>New here? <a href="/register" class="auth-link">Create a free account</a></p>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
