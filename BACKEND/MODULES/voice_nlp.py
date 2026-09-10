@@ -72,9 +72,10 @@ def analyze_transcript(transcript, indicator):
         return {
             "indicator":      indicator,
             "transcript":     transcript,
-            "emotions":       {},
+            "emotions":       {"neutral": 1.0},
             "base_score":     0.0,
             "phrase_bonus":   0.0,
+            "phrase_hits":    [],
             "weighted_score": 0.0,
             "weight_used":    INDICATOR_WEIGHTS.get(indicator, 1.0),
         }
@@ -157,13 +158,17 @@ def assess_depression(responses):
         # Per-question print
         print(f"\n[{q_id}] {question[:55]}...")
         print(f"  Transcript : \"{transcript[:80]}...\"" if len(transcript) > 80 else f"  Transcript : \"{transcript}\"")
-        print(f"  Top emotion: {max(analysis['emotions'], key=analysis['emotions'].get)} "
-              f"({max(analysis['emotions'].values()):.2f})")
+        if analysis.get('emotions'):
+            top_emo = max(analysis['emotions'], key=analysis['emotions'].get)
+            top_val = analysis['emotions'][top_emo]
+            print(f"  Top emotion: {top_emo} ({top_val:.2f})")
+        else:
+            print("  Top emotion: None")
         print(f"  Base score : {analysis['base_score']:.3f}  |  "
               f"Phrase bonus: +{analysis['phrase_bonus']:.3f}  |  "
               f"Weight: x{analysis['weight_used']}  |  "
               f"Weighted: {analysis['weighted_score']:.3f}")
-        if analysis['phrase_hits']:
+        if analysis.get('phrase_hits'):
             print(f"  Risk phrases found: {analysis['phrase_hits']}")
 
     # --- Normalize ---

@@ -39,15 +39,15 @@
 
             <!-- Score box — colour and bar width computed inline (no scoping issue) -->
             <div class="score-box">
-                <div class="score-big {{ 'score-min' if sc <= 4 else 'score-mild' if sc <= 9 else 'score-mod' if sc <= 14 else 'score-sev' if sc <= 19 else 'score-crit' }}">
+                <div class="score-big {{ 'score-min' if sc <= 20 else 'score-mild' if sc <= 40 else 'score-mod' if sc <= 60 else 'score-sev' if sc <= 80 else 'score-crit' }}">
                     {{ sc }}
                 </div>
-                <div class="score-denom">/ 27</div>
+                <div class="score-denom">/ 100</div>
                 <div class="score-sublabel">Total Score</div>
 
                 <div class="score-bar-wrap">
-                    <div class="score-bar {{ 'bar-min' if sc <= 4 else 'bar-mild' if sc <= 9 else 'bar-mod' if sc <= 14 else 'bar-sev' if sc <= 19 else 'bar-crit' }}"
-                         style="width: {{ sc * 100 // 27 if sc <= 27 else 100 }}%;"></div>
+                    <div class="score-bar {{ 'bar-min' if sc <= 20 else 'bar-mild' if sc <= 40 else 'bar-mod' if sc <= 60 else 'bar-sev' if sc <= 80 else 'bar-crit' }}"
+                         style="width: {{ sc if sc <= 100 else 100 }}%;"></div>
                 </div>
             </div>
 
@@ -55,25 +55,25 @@
             <div class="latest-info">
                 <h2 class="latest-prediction">{{ latest.prediction }}</h2>
 
-                {% if sc <= 4 %}
+                {% if sc <= 20 %}
                 <div class="severity-badge sev-minimal">
                     <i class="fas fa-circle-check"></i> Minimal / No Depression
                 </div>
                 <p class="severity-desc">Your score suggests minimal or no symptoms of depression. Keep up the healthy habits!</p>
 
-                {% elif sc <= 9 %}
+                {% elif sc <= 40 %}
                 <div class="severity-badge sev-mild">
                     <i class="fas fa-circle-half-stroke"></i> Mild Depression
                 </div>
                 <p class="severity-desc">Mild symptoms detected. Consider self-care practices and speaking to someone you trust.</p>
 
-                {% elif sc <= 14 %}
+                {% elif sc <= 60 %}
                 <div class="severity-badge sev-moderate">
                     <i class="fas fa-triangle-exclamation"></i> Moderate Depression
                 </div>
                 <p class="severity-desc">Moderate symptoms detected. Consider reaching out to a mental health professional.</p>
 
-                {% elif sc <= 19 %}
+                {% elif sc <= 80 %}
                 <div class="severity-badge sev-severe">
                     <i class="fas fa-circle-exclamation"></i> Moderately Severe
                 </div>
@@ -139,10 +139,10 @@
                 <!-- Score — colour class computed inline, no scoping issue -->
                 <div class="hist-score-wrap">
                     {% set isc = item.score | int %}
-                    <div class="hist-score {{ 'score-min' if isc <= 4 else 'score-mild' if isc <= 9 else 'score-mod' if isc <= 14 else 'score-sev' if isc <= 19 else 'score-crit' }}">
+                    <div class="hist-score {{ 'score-min' if isc <= 20 else 'score-mild' if isc <= 40 else 'score-mod' if isc <= 60 else 'score-sev' if isc <= 80 else 'score-crit' }}">
                         {{ item.score }}
                     </div>
-                    <div class="hist-score-label">/ 27</div>
+                    <div class="hist-score-label">/ 100</div>
                 </div>
 
             </div>

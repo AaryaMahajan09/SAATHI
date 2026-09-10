@@ -130,11 +130,12 @@ def predict_quiz():
         answers.append(int(val))
 
     result = predict_result(answers)
+    score_100 = round((sum(answers) / 27.0) * 100)
 
     save_result(
         session['user'],
         result.get("prediction"),
-        result.get("confidence", 0),
+        score_100,
         "quiz"
     )
 
@@ -221,7 +222,8 @@ def analyze_video():
     else:
         label = "High"
 
-    save_result(session['user'], label, final_score, "video")
+    score_100 = round((final_score / 4.0) * 100)
+    save_result(session['user'], label, score_100, "video")
     return redirect(url_for('results_page'))
 
 # ==============================

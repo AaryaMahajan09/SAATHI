@@ -79,14 +79,17 @@
                         
                         <!-- Transcript Box -->
                         <div class="transcript-box">
-                            <div class="transcript-label"><i class="fas fa-quote-left"></i> Transcript</div>
-                            <div class="transcript-content" id="transcript-{{ loop.index }}">
-                                <span class="placeholder">Your speech will appear here...</span>
+                            <div class="transcript-label">
+                                <span><i class="fas fa-quote-left"></i> Transcript (Spoken or Typed)</span>
+                                <span class="transcript-status" id="stt-status-{{ loop.index }}">Ready to record</span>
                             </div>
+                            <textarea 
+                                class="transcript-input" 
+                                name="transcript_{{ q.id }}" 
+                                id="transcript-input-{{ loop.index }}" 
+                                rows="3" 
+                                placeholder="Speak your answer after clicking 'Start Recording', or type directly here..."></textarea>
                         </div>
-                        
-                        <!-- Hidden Inputs for Form Submit -->
-                        <input type="hidden" name="transcript_{{ q.id }}" id="hidden-transcript-{{ loop.index }}" value="">
                     </div>
                     {% endfor %}
                 </div>
@@ -138,8 +141,11 @@
     let stream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
-    let speechRecognition = null;
-    let finalTranscript = "";
+    let isRecording = false;
+    let activeSpeechRec = null;
+    let currentFinalTranscript = "";
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     // 1. Initialize Camera
     async function initCamera() {
@@ -148,102 +154,127 @@
             videoElem.srcObject = stream;
             overlay.style.display = 'none';
         } catch (err) {
-            console.error("Camera access denied:", err);
-            overlay.innerHTML = '<i class="fas fa-video-slash" style="color:#ef4444;"></i><p>Camera/Microphone access denied. Please enable permissions to continue.</p>';
+            console.warn("Camera/audio access error:", err);
+            overlay.innerHTML = '<i class="fas fa-video-slash" style="color:#ef4444;"></i><p>Camera/Microphone access denied. You can still type answers directly.</p>';
         }
     }
 
-    // 2. Initialize Speech Recognition
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRec) {
-        speechRecognition = new SpeechRec();
-        speechRecognition.continuous = true;
-        speechRecognition.interimResults = true;
-        speechRecognition.lang = 'en-US';
-
-        speechRecognition.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript + ' ';
-                } else {
-                    interim += event.results[i][0].transcript;
-                }
-            }
-            updateTranscriptUI(finalTranscript, interim);
-        };
-        
-        speechRecognition.onerror = (e) => console.error("Speech Rec Error:", e.error);
-        
-        speechRecognition.onend = () => {
-            // Keep it running if we are still recording
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                try { speechRecognition.start(); } catch (e) {}
-            }
-        };
-    } else {
-        alert("Your browser does not support Speech Recognition. Please use Chrome or Edge.");
+    function setStatus(step, msg, type = 'normal') {
+        const el = document.getElementById('stt-status-' + step);
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'transcript-status' + (type === 'error' ? ' error' : type === 'success' ? ' success' : '');
     }
 
-    function updateTranscriptUI(finalTxt, interimTxt) {
-        const box = document.getElementById('transcript-' + currentStep);
-        if (!box) return;
-        
-        if (finalTxt === '' && interimTxt === '') {
-            box.innerHTML = '<span class="placeholder">Your speech will appear here...</span>';
+    // 2. Fresh Speech Recognition per recording
+    function startSpeechRecognitionForStep(step) {
+        if (!SpeechRec) {
+            setStatus(step, 'Speech recognition not supported - please type response', 'error');
             return;
         }
 
-        let html = finalTxt;
-        if (interimTxt) {
-            html += '<span style="color:var(--text-secondary); font-style:italic;">' + interimTxt + '</span>';
+        const input = document.getElementById('transcript-input-' + step);
+        currentFinalTranscript = input ? input.value.trim() : "";
+        if (currentFinalTranscript) currentFinalTranscript += " ";
+
+        try {
+            activeSpeechRec = new SpeechRec();
+            activeSpeechRec.continuous = true;
+            activeSpeechRec.interimResults = true;
+            activeSpeechRec.lang = 'en-US';
+            activeSpeechRec.maxAlternatives = 1;
+
+            activeSpeechRec.onstart = () => {
+                setStatus(step, '● Listening... speak now', 'success');
+            };
+
+            activeSpeechRec.onresult = (event) => {
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const text = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        currentFinalTranscript += text + ' ';
+                    } else {
+                        interim += text;
+                    }
+                }
+                if (input) {
+                    input.value = (currentFinalTranscript + (interim ? ' [' + interim.trim() + ']' : '')).trim();
+                }
+            };
+
+            activeSpeechRec.onerror = (e) => {
+                console.warn("Speech Rec Error:", e.error);
+                if (e.error === 'no-speech') {
+                    setStatus(step, 'No speech detected yet - speak or type below', 'normal');
+                } else if (e.error === 'not-allowed') {
+                    setStatus(step, 'Mic access blocked - you can type answer', 'error');
+                } else if (e.error === 'network') {
+                    setStatus(step, 'Speech network unavailable - you can type answer', 'error');
+                } else {
+                    setStatus(step, 'Mic paused - you can speak or type answer', 'normal');
+                }
+            };
+
+            activeSpeechRec.onend = () => {
+                if (isRecording) {
+                    setTimeout(() => {
+                        if (isRecording && activeSpeechRec) {
+                            try { activeSpeechRec.start(); } catch (_) {}
+                        }
+                    }, 250);
+                }
+            };
+
+            activeSpeechRec.start();
+        } catch (err) {
+            console.error("Failed to start speech recognition:", err);
+            setStatus(step, 'Voice engine error - you can type directly', 'error');
         }
-        box.innerHTML = html;
-        
-        // Also update hidden field
-        const hiddenInput = document.getElementById('hidden-transcript-' + currentStep);
-        if (hiddenInput) {
-            hiddenInput.value = finalTxt.trim();
+    }
+
+    function stopSpeechRecognition(step) {
+        if (activeSpeechRec) {
+            try { activeSpeechRec.stop(); } catch (_) {}
+            activeSpeechRec = null;
         }
+        const input = document.getElementById('transcript-input-' + step);
+        if (input) {
+            // Clean up any interim brackets
+            input.value = input.value.replace(/\s*\[.*?\]\s*$/, '').trim();
+        }
+        setStatus(step, input && input.value ? '✓ Captured' : 'Ready', 'normal');
     }
 
     // 3. Control Logic
     btnRecord.addEventListener('click', () => {
-        if (!stream) {
-            alert("Waiting for camera/microphone access...");
-            return;
-        }
-        
-        // Reset transcript
-        finalTranscript = '';
-        updateTranscriptUI('', '');
-        
-        // Start Video Recording
-        recordedChunks = [];
-        let options = { mimeType: 'video/webm;codecs=vp8,opus' };
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/webm' };
+        isRecording = true;
+        const currentInput = document.getElementById('transcript-input-' + currentStep);
+
+        // Start Video Recording if stream is available
+        if (stream) {
+            recordedChunks = [];
+            let options = { mimeType: 'video/webm;codecs=vp8,opus' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = { mimeType: 'video/mp4' };
+                options = { mimeType: 'video/webm' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/mp4' };
+                }
             }
-        }
-        
-        try {
-            mediaRecorder = new MediaRecorder(stream, options);
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) recordedChunks.push(e.data);
-            };
-            mediaRecorder.start(200); // collect 200ms chunks
-        } catch (e) {
-            console.error("MediaRecorder start failed:", e);
-            alert("Could not start video recording.");
-            return;
+            
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+                mediaRecorder.start(200);
+            } catch (e) {
+                console.warn("MediaRecorder could not start:", e);
+            }
         }
 
         // Start Speech Recognition
-        if (speechRecognition) {
-            try { speechRecognition.start(); } catch (e) {}
-        }
+        startSpeechRecognitionForStep(currentStep);
 
         // UI Updates
         recIndicator.style.display = 'flex';
@@ -253,11 +284,8 @@
     });
 
     btnStop.addEventListener('click', () => {
-        // Stop Speech Recognition
-        if (speechRecognition) {
-            speechRecognition.stop();
-        }
-        
+        isRecording = false;
+        stopSpeechRecognition(currentStep);
         recIndicator.style.display = 'none';
 
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -280,16 +308,13 @@
                     fileInput.style.display = 'none';
                     form.appendChild(fileInput);
                 } catch (e) {
-                    console.error("DataTransfer error (likely Safari):", e);
-                    // Fallback for older browsers without DataTransfer: just ignore video upload for now
+                    console.warn("DataTransfer unsupported:", e);
                 }
                 
-                // Move to next question
                 goToNextQuestion();
             };
             mediaRecorder.stop();
         } else {
-            // If mediaRecorder was never started or already stopped
             goToNextQuestion();
         }
     });
@@ -314,7 +339,6 @@
             btnStop.classList.add('hidden');
             btnSubmit.classList.remove('hidden');
             
-            // We can optionally stop the camera here
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 videoElem.srcObject = null;
@@ -324,7 +348,7 @@
         }
     }
 
-    // Start!
+    // Start camera!
     initCamera();
 
 })();
